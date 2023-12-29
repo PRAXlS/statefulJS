@@ -1,0 +1,19 @@
+{
+  "name": "statefuljs",
+  "version": "1.0.1",
+  "description": "stateful.js is a lightweight and intuitive JavaScript library that enhances the capabilities of custom HTML elements by introducing a stateful paradigm.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PRAXlS/statefulJS.git"
+  },
+  "author": "Lalin Hugo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/PRAXlS/statefulJS/issues"
+  },
+  "homepage": "https://github.com/PRAXlS/statefulJS#readme"
+}

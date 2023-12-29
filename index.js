@@ -22,8 +22,7 @@ class StatefulElement extends HTMLElement {
     }
 
     _renderContent(){
-        this.stateCount = 0;
-        this.content.innerHTML = this.render();
+        this.content.innerHTML = this.sanitizeHTML(this.render());
         this.eventHandlers();
     }
 
@@ -132,6 +131,28 @@ class StatefulElement extends HTMLElement {
         }
 
         return ""+hash;
+    }
+
+    //doesn't prevent code execution and XSS, only remove parasite chars echoed when returning list of HTML nodes
+    sanitizeHTML(rawHtml) {
+        const bodyElement = document.createElement("toSanitize");
+        bodyElement.innerHTML = rawHtml
+
+        const toCheck = []
+
+        toCheck.push(bodyElement)
+
+        while(toCheck.length != 0){
+            const e = toCheck.pop()
+
+            if(e.nodeName == "#text" && e.textContent == "," && e.previousSibling != null && e.nextSibling != null) e.remove()
+
+            for(let i = 0; i < e.childNodes.length; i++){
+                toCheck.push(e.childNodes[i])
+            }
+        }
+
+        return bodyElement.innerHTML
     }
 
 }
