@@ -35,7 +35,7 @@ class StatefulElement extends HTMLElement {
     }
 
     style(){
-        return "";l
+        return "";
     }
 
     useStylesheet(href) {
