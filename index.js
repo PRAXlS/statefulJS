@@ -136,23 +136,25 @@ class StatefulElement extends HTMLElement {
     //doesn't prevent code execution and XSS, only remove parasite chars echoed when returning list of HTML nodes
     sanitizeHTML(rawHtml) {
         const bodyElement = document.createElement("toSanitize");
-        bodyElement.innerHTML = rawHtml
+        bodyElement.innerHTML = rawHtml;
 
-        const toCheck = []
+        const toCheck = [];
 
-        toCheck.push(bodyElement)
+        toCheck.push(bodyElement);
 
         while(toCheck.length != 0){
-            const e = toCheck.pop()
+            const e = toCheck.pop();
 
-            if(e.nodeName == "#text" && e.textContent == "," && e.previousSibling != null && e.nextSibling != null) e.remove()
+            if(e.nodeName == "#text" && e.textContent == "," && e.previousSibling != null && e.nextSibling != null){
+                e.remove();
+            }
 
             for(let i = 0; i < e.childNodes.length; i++){
-                toCheck.push(e.childNodes[i])
+                toCheck.push(e.childNodes[i]);
             }
         }
 
-        return bodyElement.innerHTML
+        return bodyElement.innerHTML;
     }
 
 }
