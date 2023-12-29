@@ -1,3 +1,26 @@
+class Stateful {
+
+    static elementsLocations = {}
+    static globalStylesheets = []
+
+    static addGlobalStylesheet(href){
+        const scriptUrl = new URL(document.currentScript.src);
+
+        // Resolve the relative path based on the calling script's location
+        const resolvedHref = new URL(href, scriptUrl).href;
+
+        if(this.globalStylesheets.includes(resolvedHref)) return;
+
+        this.globalStylesheets.push(resolvedHref);
+    }
+
+    static define(tag, elem){
+        this.elementsLocations[tag.toUpperCase()] = document.currentScript.src;
+        customElements.define(tag, elem);
+    }
+
+}
+
 class StatefulElement extends HTMLElement {
 
     constructor() {
@@ -12,12 +35,17 @@ class StatefulElement extends HTMLElement {
         this.content = document.createElement("elem-content");
         this.shadow.appendChild(this.content);
 
-        this._renderContent();
-
         //append custom style
         const style = document.createElement("style");
         style.textContent = this.style();
         this.shadow.appendChild(style);
+
+        //apply global stylesheets
+        for(const href of Stateful.globalStylesheets){
+            this.useStylesheet(href);
+        }
+
+        this._renderContent();
 
     }
 
@@ -39,7 +67,8 @@ class StatefulElement extends HTMLElement {
     }
 
     useStylesheet(href) {
-        const scriptUrl = new URL(document.currentScript.src);
+        console.log(this.tagName);
+        const scriptUrl = new URL(Stateful.elementsLocations[this.tagName]);
 
         // Resolve the relative path based on the script's location
         const resolvedHref = new URL(href, scriptUrl).href;
@@ -87,16 +116,19 @@ class StatefulElement extends HTMLElement {
         const funcHash = this.hashFunction(func);
 
         if(this.states[funcHash] !== undefined){
-            return this.states[funcHash][0];
+            return {data: this.states[funcHash][0], loading: false};
         }
 
-        const [data, setData] = this.useState(funcHash, null);
+        const [data] = this.useState(funcHash, null);
 
         const fetchData = async () => {
             try {
+                const [state, setState] = this.useState(funcHash, null);
+
                 const result = await func();
-                if (JSON.stringify(result) !== JSON.stringify(data)) {
-                    setData(result);
+
+                if (JSON.stringify(result) !== JSON.stringify(state)) {
+                    setState(result);
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -112,7 +144,7 @@ class StatefulElement extends HTMLElement {
         // Initial data fetch
         fetchData();
 
-        return data;
+        return {data, loading: true};
     }
 
     querySelector(selectors) {
