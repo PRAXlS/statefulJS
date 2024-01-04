@@ -26,6 +26,8 @@ class StatefulElement extends HTMLElement {
     constructor() {
         super();
 
+        this.uid = crypto.randomUUID();
+
         this.states = {};
 
         //create shadow root
@@ -51,9 +53,21 @@ class StatefulElement extends HTMLElement {
 
     _renderContent(){
         this.content.innerHTML = this.sanitizeHTML(this.render());
-        requestAnimationFrame(() => {
-            this.eventHandlers();
-        });
+
+        const _this = this
+
+        let after = () => {
+            try {
+                _this.eventHandlers();
+                _this.renderFuncs();
+            }catch (e){
+                setTimeout(() => {
+                    after()
+                }, 10)
+            }
+        }
+
+        after()
     }
 
     eventHandlers(){
@@ -148,6 +162,20 @@ class StatefulElement extends HTMLElement {
         return {data, loading: true};
     }
 
+    registerFunction(func) {
+
+        const funcHash = this.hashFunction(func);
+
+        if (window.statefulFuncs === undefined){
+            window.statefulFuncs = {};
+        }
+
+        window.statefulFuncs[this.uid + funcHash] = func;
+
+        return "statefulFunc$"+this.uid + funcHash+"$";
+    }
+
+
     querySelector(selectors) {
         return this.shadow.querySelector(selectors);
     }
@@ -178,16 +206,46 @@ class StatefulElement extends HTMLElement {
         while(toCheck.length != 0){
             const e = toCheck.pop();
 
-            if(e.nodeName == "#text" && e.textContent == "," && e.previousSibling != null && e.nextSibling != null){
+            for(let i = 0; i < e.childNodes.length; i++){
+                toCheck.push(e.childNodes[i]);
+            }
+
+            if(e.nodeName == "#text" && e.textContent.trim() == "," && e.previousSibling != null && e.nextSibling != null){
                 e.remove();
             }
+
+        }
+
+        return bodyElement.innerHTML;
+    }
+
+    renderFuncs(){
+
+        const toCheck = [];
+
+        toCheck.push(this.content);
+
+        while(toCheck.length != 0){
+            const e = toCheck.pop();
 
             for(let i = 0; i < e.childNodes.length; i++){
                 toCheck.push(e.childNodes[i]);
             }
-        }
 
-        return bodyElement.innerHTML;
+            if(e.attributes !== undefined){
+                for(let attr in e.attributes){
+                    if(e.attributes[attr].nodeName === undefined || e.attributes[attr].nodeValue === undefined){
+                        continue;
+                    }
+
+                    if(!e.attributes[attr].nodeValue.startsWith("statefulFunc$")){
+                        continue;
+                    }
+
+                    e[e.attributes[attr].nodeName] = window.statefulFuncs[e.attributes[attr].nodeValue.slice(13, -1)];
+                }
+            }
+        }
     }
 
 }
