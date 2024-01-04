@@ -34,7 +34,7 @@ class StatefulElement extends HTMLElement {
         this.shadow = this.attachShadow({ mode: 'open' });
 
         //append custom HTML
-        this.content = document.createElement("elem-content");
+        this.content = document.createElement("stateful-content");
         this.shadow.appendChild(this.content);
 
         //append custom style
@@ -178,6 +178,10 @@ class StatefulElement extends HTMLElement {
 
     querySelector(selectors) {
         return this.shadow.querySelector(selectors);
+    }
+
+    querySelectorAll(selectors) {
+        return this.shadow.querySelectorAll(selectors);
     }
 
     //returns a hash for a given function, collisions are possible but shouldn't be a concern for our use-case
