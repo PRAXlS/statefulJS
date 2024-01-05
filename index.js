@@ -2,6 +2,7 @@ class Stateful {
 
     static elementsLocations = {}
     static globalStylesheets = []
+    static stylesMap = {}
 
     static addGlobalStylesheet(href){
         const scriptUrl = new URL(document.currentScript.src);
@@ -12,11 +13,45 @@ class Stateful {
         if(this.globalStylesheets.includes(resolvedHref)) return;
 
         this.globalStylesheets.push(resolvedHref);
+
+        for(const styleSheet of document.styleSheets){
+            if(styleSheet.href == resolvedHref){
+                const sheet = new CSSStyleSheet();
+                sheet.replaceSync(Stateful.styleSheetToString(styleSheet));
+
+                Stateful.stylesMap[resolvedHref] = sheet
+                return
+            }
+        }
     }
 
     static define(tag, elem){
         this.elementsLocations[tag.toUpperCase()] = document.currentScript.src;
         customElements.define(tag, elem);
+    }
+
+    static styleSheetToString(sheet){
+        let res = ""
+
+        for(const rule of sheet.cssRules){
+            res = res + rule.cssText
+        }
+
+        return res
+    }
+
+    //returns a hash for a given function, collisions are possible but shouldn't be a concern for our use-case
+    static hash(func){
+        const str = func.toString();
+
+        let hash = 0;
+        for (let i = 0, len = str.length; i < len; i++) {
+            let chr = str.charCodeAt(i);
+            hash = (hash << 5) - hash + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+
+        return ""+hash;
     }
 
 }
@@ -33,19 +68,26 @@ class StatefulElement extends HTMLElement {
         //create shadow root
         this.shadow = this.attachShadow({ mode: 'open' });
 
-        //append custom HTML
-        this.content = document.createElement("stateful-content");
-        this.shadow.appendChild(this.content);
-
         //append custom style
-        const style = document.createElement("style");
-        style.textContent = this.style();
-        this.shadow.appendChild(style);
+        const style = this.style()
+        const styleHash = Stateful.hash(style)
+
+        if(Stateful.stylesMap[styleHash] === undefined){
+            const sheet = new CSSStyleSheet();
+            sheet.replaceSync(style);
+            Stateful.stylesMap[styleHash] = sheet
+        }
+
+        this.shadow.adoptedStyleSheets.push(Stateful.stylesMap[styleHash])
 
         //apply global stylesheets
         for(const href of Stateful.globalStylesheets){
             this.useStylesheet(href);
         }
+
+        //append custom HTML
+        this.content = document.createElement("stateful-content");
+        this.shadow.appendChild(this.content);
 
         this._renderContent();
 
@@ -88,11 +130,21 @@ class StatefulElement extends HTMLElement {
         // Resolve the relative path based on the script's location
         const resolvedHref = new URL(href, scriptUrl).href;
 
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = resolvedHref;
+        if(Stateful.stylesMap[resolvedHref] !== undefined){
+            this.shadow.adoptedStyleSheets.push(Stateful.stylesMap[resolvedHref])
+            return
+        }
 
-        this.shadow.appendChild(link);
+        for(const styleSheet of document.styleSheets){
+            if(styleSheet.href == resolvedHref){
+                const sheet = new CSSStyleSheet();
+                sheet.replaceSync(Stateful.styleSheetToString(styleSheet));
+
+                Stateful.stylesMap[resolvedHref] = sheet
+                this.shadow.adoptedStyleSheets.push(sheet)
+                return
+            }
+        }
     }
 
     useState(id, initialState) {
@@ -128,7 +180,7 @@ class StatefulElement extends HTMLElement {
             throw new Error('Invalid parameter: interval must be a positive integer.');
         }
 
-        const funcHash = this.hashFunction(func);
+        const funcHash = Stateful.hash(func);
 
         if(this.states[funcHash] !== undefined){
             return {data: this.states[funcHash][0], loading: false};
@@ -164,7 +216,7 @@ class StatefulElement extends HTMLElement {
 
     registerFunction(func) {
 
-        const funcHash = this.hashFunction(func);
+        const funcHash = Stateful.hash(func);
 
         if (window.statefulFuncs === undefined){
             window.statefulFuncs = {};
@@ -182,20 +234,6 @@ class StatefulElement extends HTMLElement {
 
     querySelectorAll(selectors) {
         return this.shadow.querySelectorAll(selectors);
-    }
-
-    //returns a hash for a given function, collisions are possible but shouldn't be a concern for our use-case
-    hashFunction(func){
-        const str = func.toString();
-
-        let hash = 0;
-        for (let i = 0, len = str.length; i < len; i++) {
-            let chr = str.charCodeAt(i);
-            hash = (hash << 5) - hash + chr;
-            hash |= 0; // Convert to 32bit integer
-        }
-
-        return ""+hash;
     }
 
     //doesn't prevent code execution and XSS, only remove parasite chars echoed when returning list of HTML nodes
