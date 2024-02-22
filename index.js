@@ -64,6 +64,7 @@ class StatefulElement extends HTMLElement {
         this.uid = crypto.randomUUID();
 
         this.states = {};
+        this.intervals = {};
 
         //create shadow root
         this.shadow = this.attachShadow({ mode: 'open' });
@@ -89,40 +90,53 @@ class StatefulElement extends HTMLElement {
         this.content = document.createElement("stateful-content");
         this.shadow.appendChild(this.content);
 
-        this._renderContent();
+        //this._renderContent();
 
     }
 
-    _renderContent(){
-        const active = this.shadow.activeElement
+    connectedCallback(){
+        this._renderContent();
+    }
 
-        this.content.innerHTML = this.sanitizeHTML(this.render());
+    async _renderContent(){
+        this.beforeRender()
+
+        let active = this.shadow.activeElement
+        if(active && active.id) active = active.id
+
+        this.content.innerHTML = this.sanitizeHTML(await this.render());
 
         const _this = this
 
         let after = () => {
             try {
-                _this.eventHandlers();
                 _this.renderFuncs();
+                _this.eventHandlers();
 
-                if(active && active.id){
-                    this.shadowRoot.querySelector("#"+active.id).focus()
-                }
+                if(active) _this.shadow.querySelector("#"+active).focus()
+
+                _this.afterRender()
             }catch (e){
                 setTimeout(() => {
                     after()
-                }, 10)
+                }, 0)
             }
         }
 
-        after()
+        setTimeout(() => {
+            after()
+        }, 0)
     }
 
     eventHandlers(){
 
     }
 
-    render(){
+    beforeRender(){}
+
+    afterRender(){}
+
+    async render(){
         return "";
     }
 
@@ -182,7 +196,7 @@ class StatefulElement extends HTMLElement {
             throw new Error('Invalid parameter: fetchFunction must be a function.');
         }
 
-        if (!Number.isInteger(interval) || interval <= 0) {
+        if (!Number.isInteger(interval)) {
             throw new Error('Invalid parameter: interval must be a positive integer.');
         }
 
@@ -208,16 +222,23 @@ class StatefulElement extends HTMLElement {
             }
         };
 
-        // Use setInterval to fetch data at regular intervals
-        const intervalId = setInterval(fetchData, interval);
+        if(interval > 0){
+            // Use setInterval to fetch data at regular intervals
+            const intervalId = setInterval(fetchData, interval);
+            this.intervals[intervalId] = fetchData
 
-        // Cleanup interval when the element is disconnected from the DOM
-        this.addEventListener('disconnectedCallback', () => clearInterval(intervalId));
+            // Cleanup interval when the element is disconnected from the DOM
+            this.addEventListener('disconnectedCallback', () => clearInterval(intervalId));
+        }
 
         // Initial data fetch
         fetchData();
 
         return {data, loading: true};
+    }
+
+    useFunction(func){
+        return this.useInterval(func, -1);
     }
 
     registerFunction(func) {
@@ -294,6 +315,12 @@ class StatefulElement extends HTMLElement {
                 }
             }
         }
+    }
+
+    runIntervals(){
+        Object.values(this.intervals).forEach(func => {
+            func()
+        });
     }
 
 }
